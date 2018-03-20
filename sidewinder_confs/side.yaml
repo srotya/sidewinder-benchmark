@@ -1,0 +1,12 @@
+server:
+  gzip:
+    enabled: true
+    bufferSize: 8KiB
+  applicationConnectors:
+  - type: http
+    port: 8080
+    acceptQueueSize: 1024
+  adminConnectors: []
+  requestLog:
+    appenders: []
+configPath: side.props
