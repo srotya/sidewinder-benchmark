@@ -29,6 +29,8 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -41,10 +43,12 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 
+import com.google.common.base.Splitter;
 import com.srotya.sidewinder.core.rpc.Ack;
 import com.srotya.sidewinder.core.rpc.BatchData;
 import com.srotya.sidewinder.core.rpc.Point;
 import com.srotya.sidewinder.core.rpc.Point.Builder;
+import com.srotya.sidewinder.core.rpc.Tag;
 import com.srotya.sidewinder.core.rpc.WriterServiceGrpc;
 import com.srotya.sidewinder.core.rpc.WriterServiceGrpc.WriterServiceBlockingStub;
 
@@ -55,6 +59,13 @@ import io.grpc.ManagedChannelBuilder;
  *
  */
 public class SidewinderClient {
+	
+	private static final Splitter TAG = Splitter.on('=');
+	private static final Splitter SPACE = Splitter.on(Pattern.compile("\\s+"));
+	private static final Splitter COMMA = Splitter.on(',');
+	private static final Splitter NEWLINE = Splitter.on('\n');
+	private static final int LENGTH_OF_MILLISECOND_TS = 13;
+	private static final Logger logger = Logger.getLogger(SidewinderClient.class.getName());
 
 	public static void main(String[] args) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException,
 			ClientProtocolException, IOException, InterruptedException {
@@ -72,7 +83,7 @@ public class SidewinderClient {
 					@Override
 					public PooledObject<WriterServiceBlockingStub> makeObject() throws Exception {
 						return new DefaultPooledObject<WriterServiceGrpc.WriterServiceBlockingStub>(
-								WriterServiceGrpc.newBlockingStub(ManagedChannelBuilder.forAddress("localhost", 9928)
+								WriterServiceGrpc.newBlockingStub(ManagedChannelBuilder.forAddress(args[1], 9928)
 										.usePlaintext(true).build()));
 					}
 
@@ -142,68 +153,70 @@ public class SidewinderClient {
 		System.out.println(new Date() + "   " + i);
 	}
 
+
 	public static List<Point> pointsFromString(String dbName, String payload) {
 		List<Point> dps = new ArrayList<>();
-		String[] splits = payload.split("[\\r\\n]+");
-		for (String split : splits) {
-			try {
-				String[] parts = split.split("\\s+");
-				if (parts.length < 2 || parts.length > 3) {
+		try {
+			Iterable<String> splits = NEWLINE.splitToList(payload);
+			for (String split : splits) {
+				List<String> parts = SPACE.splitToList(split);
+				if (parts.size() < 2 || parts.size() > 3) {
 					// invalid datapoint => drop
-					System.out.println("Invalid dp:" + split);
 					continue;
 				}
 				long timestamp = System.currentTimeMillis();
-				if (parts.length == 3) {
-					timestamp = Long.parseLong(parts[2]);
-					if (parts[2].length() > 13) {
+				if (parts.size() == 3) {
+					timestamp = Long.parseLong(parts.get(2));
+					if (parts.get(2).length() > LENGTH_OF_MILLISECOND_TS) {
 						timestamp = timestamp / (1000 * 1000);
 					}
 				} else {
-					System.out.println("DB timestamp");
+					logger.info("Bad datapoint timestamp:" + parts.size());
 				}
-				String[] key = parts[0].split(",");
-				String measurementName = key[0];
-				Set<String> tTags = new HashSet<>();
-				for (int i = 1; i < key.length; i++) {
-					tTags.add(key[i]);
+				List<String> key = COMMA.splitToList(parts.get(0));
+				String measurementName = key.get(0);
+				Set<Tag> tTags = new HashSet<>();
+				for (int i = 1; i < key.size(); i++) {
+					// Matcher matcher = TAG_PATTERN.matcher(key[i]);
+					// if (matcher.find()) {
+					// tTags.add(Tag.newBuilder().setTagKey(matcher.group(1)).setTagValue(matcher.group(2)).build());
+					// }
+
+					List<String> s = TAG.splitToList(key.get(i));
+					tTags.add(Tag.newBuilder().setTagKey(s.get(0)).setTagValue(s.get(1)).build());
 				}
-				List<String> tags = new ArrayList<>(tTags);
-				String[] fields = parts[1].split(",");
+				List<Tag> tags = new ArrayList<>(tTags);
+				List<String> fields = COMMA.splitToList(parts.get(1));
+				Builder builder = Point.newBuilder();
+				builder.setDbName(dbName);
+				builder.setMeasurementName(measurementName);
+				builder.addAllTags(tags);
+				builder.setTimestamp(timestamp);
 				for (String field : fields) {
 					String[] fv = field.split("=");
 					String valueFieldName = fv[0];
 					if (!fv[1].endsWith("i")) {
 						double value = Double.parseDouble(fv[1]);
-						Builder builder = Point.newBuilder();
-						builder.setDbName(dbName);
-						builder.setMeasurementName(measurementName);
-						builder.setValueFieldName(valueFieldName);
-						builder.setValue(Double.doubleToLongBits(value));
-						builder.addAllTags(tags);
-						builder.setTimestamp(timestamp);
-						builder.setFp(true);
-						dps.add(builder.build());
+						builder.addValueFieldName(valueFieldName);
+						builder.addValue(Double.doubleToLongBits(value));
+						builder.addFp(true);
 					} else {
 						fv[1] = fv[1].substring(0, fv[1].length() - 1);
 						long value = Long.parseLong(fv[1]);
-						Builder builder = Point.newBuilder();
-						builder.setDbName(dbName);
-						builder.setMeasurementName(measurementName);
-						builder.setValueFieldName(valueFieldName);
-						builder.setValue(value);
-						builder.addAllTags(tags);
-						builder.setTimestamp(timestamp);
-						builder.setFp(false);
-						dps.add(builder.build());
+						builder.addValueFieldName(valueFieldName);
+						builder.addValue(value);
+						builder.addFp(false);
 					}
 				}
-			} catch (Exception e) {
-				e.printStackTrace();
+				dps.add(builder.build());
 			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			logger.fine("Rejected:" + payload);
 		}
 		return dps;
 	}
+
 
 	public static CloseableHttpClient buildClient(String baseURL, int connectTimeout, int requestTimeout)
 			throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {

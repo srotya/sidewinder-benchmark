@@ -38,6 +38,7 @@ import org.apache.http.impl.client.HttpClients;
 import com.srotya.sidewinder.core.rpc.BatchData;
 import com.srotya.sidewinder.core.rpc.BatchData.Builder;
 import com.srotya.sidewinder.core.rpc.Point;
+import com.srotya.sidewinder.core.rpc.Tag;
 import com.srotya.sidewinder.core.rpc.WriterServiceGrpc;
 import com.srotya.sidewinder.core.rpc.WriterServiceGrpc.WriterServiceBlockingStub;
 
@@ -72,21 +73,25 @@ public class StockLoader2 {
 						Date timestamp = format.parse(splits[0]);
 						long ts = timestamp.getTime();
 
-						builder.addPoints(Point.newBuilder().setDbName("stocks").setMeasurementName("ticker")
-								.setValueFieldName("open").setFp(true).setTimestamp(ts).addTags(ticker)
-								.setValue(Double.doubleToLongBits(Double.parseDouble(splits[2]))).build());
-						builder.addPoints(Point.newBuilder().setDbName("stocks").setMeasurementName("ticker")
-								.setValueFieldName("high").setFp(true).setTimestamp(ts).addTags(ticker)
-								.setValue(Double.doubleToLongBits(Double.parseDouble(splits[3]))).build());
-						builder.addPoints(Point.newBuilder().setDbName("stocks").setMeasurementName("ticker")
-								.setValueFieldName("low").setFp(true).setTimestamp(ts).addTags(ticker)
-								.setValue(Double.doubleToLongBits(Double.parseDouble(splits[4]))).build());
-						builder.addPoints(Point.newBuilder().setDbName("stocks").setMeasurementName("ticker")
-								.setValueFieldName("close").setFp(true).setTimestamp(ts).addTags(ticker)
-								.setValue(Double.doubleToLongBits(Double.parseDouble(splits[5]))).build());
-						builder.addPoints(Point.newBuilder().setDbName("stocks").setMeasurementName("ticker")
-								.setValueFieldName("volume").setFp(true).setTimestamp(ts).addTags(ticker)
-								.setValue(Double.doubleToLongBits(Double.parseDouble(splits[5]))).build());
+						com.srotya.sidewinder.core.rpc.Point.Builder pointBuilder = Point.newBuilder()
+								.setDbName("stocks").setMeasurementName("ticker").setTimestamp(ts)
+								.addTags(Tag.newBuilder().setTagKey("symbol").setTagValue(ticker));
+
+						pointBuilder.addValueFieldName("open").addFp(true)
+								.addValue(Double.doubleToLongBits(Double.parseDouble(splits[2])));
+
+						pointBuilder.addValueFieldName("high").addFp(true)
+								.addValue(Double.doubleToLongBits(Double.parseDouble(splits[3])));
+
+						pointBuilder.addValueFieldName("low").addFp(true)
+								.addValue(Double.doubleToLongBits(Double.parseDouble(splits[4])));
+
+						pointBuilder.addValueFieldName("close").addFp(true)
+								.addValue(Double.doubleToLongBits(Double.parseDouble(splits[5])));
+
+						pointBuilder.addValueFieldName("volume").addFp(true)
+								.addValue(Double.doubleToLongBits(Double.parseDouble(splits[6])));
+						
 						counter++;
 						if (counter % 1000 == 0) {
 							WriterServiceBlockingStub writer = WriterServiceGrpc.newBlockingStub(channel);
