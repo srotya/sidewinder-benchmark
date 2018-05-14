@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Ambud Sharma
+ * Copyright Ambud Sharma
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ public class InfluxClientStandalone {
 			_THREAD = Integer.parseInt(args[0]);
 		}
 
-		String url = "http://" + args[1] + ":8080/influx?db=influx";
+		String url = "http://" + args[1] + ":8080/influx?db=influx&preSorted=true";
 
 		final String URL = url;
 
@@ -98,7 +98,7 @@ public class InfluxClientStandalone {
 				}, config);
 		while ((temp = reader.readLine()) != null) {
 			builder.append(temp.trim() + "\n");
-			if (i % 1000 == 0) {
+			if (i % 2000 == 0) {
 				final String val = builder.toString();
 				builder = new StringBuilder();
 				boolean submit = false;

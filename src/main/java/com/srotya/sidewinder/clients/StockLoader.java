@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Ambud Sharma
+ * Copyright Ambud Sharma
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ public class StockLoader {
 				ts = timestamp.getTime();
 				// ts = ts + 1000 * 5;
 
-				String metric = "ticker,s=" + ticker + " open=" + splits[2] + ",high=" + splits[3] + ",low=" + splits[4]
+				String metric = "ticker,symbol=" + ticker + " open=" + splits[2] + ",high=" + splits[3] + ",low=" + splits[4]
 						+ ",close=" + splits[5] + ",volume=" + splits[6] + " " + ts * 1000 * 1000;
 				req.append(metric + "\n");
 				counter++;

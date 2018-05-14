@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Ambud Sharma
+ * Copyright Ambud Sharma
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@
 package com.srotya.sidewinder.clients;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -31,6 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.PooledObjectFactory;
@@ -59,7 +61,7 @@ import io.grpc.ManagedChannelBuilder;
  *
  */
 public class SidewinderClient {
-	
+
 	private static final Splitter TAG = Splitter.on('=');
 	private static final Splitter SPACE = Splitter.on(Pattern.compile("\\s+"));
 	private static final Splitter COMMA = Splitter.on(',');
@@ -69,11 +71,12 @@ public class SidewinderClient {
 
 	public static void main(String[] args) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException,
 			ClientProtocolException, IOException, InterruptedException {
-		int _THREAD = 4;
+		int _THREAD = 8;
 		ThreadPoolExecutor es = new ThreadPoolExecutor(_THREAD, _THREAD, Integer.MAX_VALUE, TimeUnit.SECONDS,
 				new ArrayBlockingQueue<>(100));
 
-		BufferedReader reader = new BufferedReader(new FileReader(args[0]));
+		BufferedReader reader = new BufferedReader(
+				new InputStreamReader(new GZIPInputStream(new FileInputStream(args[0]))));
 
 		GenericObjectPoolConfig config = new GenericObjectPoolConfig();
 		config.setMaxTotal(_THREAD);
@@ -83,8 +86,8 @@ public class SidewinderClient {
 					@Override
 					public PooledObject<WriterServiceBlockingStub> makeObject() throws Exception {
 						return new DefaultPooledObject<WriterServiceGrpc.WriterServiceBlockingStub>(
-								WriterServiceGrpc.newBlockingStub(ManagedChannelBuilder.forAddress(args[1], 9928)
-										.usePlaintext(true).build()));
+								WriterServiceGrpc.newBlockingStub(
+										ManagedChannelBuilder.forAddress(args[1], 9928).usePlaintext(true).build()));
 					}
 
 					@Override
@@ -153,7 +156,6 @@ public class SidewinderClient {
 		System.out.println(new Date() + "   " + i);
 	}
 
-
 	public static List<Point> pointsFromString(String dbName, String payload) {
 		List<Point> dps = new ArrayList<>();
 		try {
@@ -216,7 +218,6 @@ public class SidewinderClient {
 		}
 		return dps;
 	}
-
 
 	public static CloseableHttpClient buildClient(String baseURL, int connectTimeout, int requestTimeout)
 			throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
